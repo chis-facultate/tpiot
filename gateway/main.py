@@ -3,24 +3,63 @@ import paho.mqtt.client as mqtt
 import requests
 import json
 
+station_id = None
+FLASK_SERVER_URL = 'http://localhost:5000/data'
+#expected_sensors = ['SO2', 'NO2', 'CO', 'O3', 'PM10', 'PM2.5']
+expected_sensors = ['SO2', 'NO2']
+sensors_data_buffer = {}
+
+
+def check_buffer_full():
+    keys = sensors_data_buffer.keys()
+    if len(keys) != len(expected_sensors):
+        return False
+    return True
+
+
+# Forward data to Flask server in the cloud
+def forward_data():
+    try:
+        data = {
+            'station_id': station_id,
+            'sensor_data': sensors_data_buffer
+        }
+        headers = {'Content-Type': 'application/json'}
+        json_data = json.dumps(data)
+        response = requests.post(FLASK_SERVER_URL, data=json_data, headers=headers)
+
+        if response.status_code == 200:
+            print("Data successfully sent to the Flask server.")
+        else:
+            print(f"Failed to send data to the Flask server: {response.status_code}")
+    except Exception as e:
+        print(f"Error forwarding data to Flask server: {e}")
+
 
 # Callback when a message is received from any MQTT topic the gateway is subscribed to
 def on_message(client, userdata, msg):
-    print(f"Received message on topic {msg.topic}: {msg.payload.decode()}")
+    json_payload = msg.payload.decode()
+    print(f"Received message on topic {msg.topic}: {json_payload}")
 
-    # Forward data to Flask server in the cloud
-    try:
-        data = {"sensor_data": msg.payload.decode()}
-        headers = {'Content-Type': 'application/json'}
-        json_data = json.dumps(data)
-        # response = requests.post(FLASK_SERVER_URL, data=json_data, headers=headers)
-        #
-        # if response.status_code == 200:
-        #     print("Data successfully sent to the Flask server.")
-        # else:
-        #     print(f"Failed to send data to the Flask server: {response.status_code}")
-    except Exception as e:
-        print(f"Error forwarding data to Flask server: {e}")
+    dict_payload = json.loads(json_payload)
+
+    # Extract the data in the payload
+    sensor_type = dict_payload['sensor_type']
+    timestamp = dict_payload['timestamp']
+    value = dict_payload['value']
+
+    # Change the format of the data
+    sensor_data = {
+        'timestamp': timestamp,
+        'value': value
+    }
+    # Save the data in the buffer
+    sensors_data_buffer[sensor_type] = sensor_data
+
+    # Check if all sensors have sent the data
+    if check_buffer_full():
+        forward_data()
+        sensors_data_buffer.clear()
 
 
 # Callbacks
@@ -51,11 +90,9 @@ def main():
     if len(sys.argv) != 2:
         print("Usage: python script.py <station_id>")
         sys.exit(1)
-    station_id = sys.argv[1]
 
-    # Flask server details (on the cloud)
-    # FLASK_SERVER_URL = "http://your-flask-server.com/api/data"
-    FLASK_SERVER_URL = '127.0.0.1:5000'
+    global station_id
+    station_id = sys.argv[1]
 
     # MQTT broker details (local broker on the gateway)
     MQTT_BROKER = "localhost"
