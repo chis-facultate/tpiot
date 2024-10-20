@@ -98,6 +98,7 @@ def main():
     MQTT_BROKER = "127.0.0.1"
     MQTT_PORT = 1883
     MQTT_TOPIC = f"station_{station_id}"
+    MQTT_KEEPALIVE = 60
 
     # Initialize MQTT client
     mqtt_client = mqtt.Client()
@@ -109,7 +110,7 @@ def main():
 
     # Connect to the MQTT broker
     try:
-        mqtt_client.connect(MQTT_BROKER, MQTT_PORT)
+        mqtt_client.connect(MQTT_BROKER, MQTT_PORT, MQTT_KEEPALIVE)
         print(f"Connected to MQTT broker at {MQTT_BROKER}")
     except Exception as e:
         print(f"Could not connect to MQTT broker: {e}")
