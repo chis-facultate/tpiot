@@ -3,8 +3,8 @@ import paho.mqtt.client as mqtt
 import requests
 import json
 
-station_id = None
-FLASK_SERVER_URL = 'http://localhost:5000/data'
+station_code = None
+flask_server_url = 'http://localhost:5000/data'
 #expected_sensors = ['SO2', 'NO2', 'CO', 'O3', 'PM10', 'PM2.5']
 expected_sensors = ['SO2', 'NO2']
 sensors_data_buffer = {}
@@ -21,12 +21,12 @@ def check_buffer_full():
 def forward_data():
     try:
         data = {
-            'station_id': station_id,
-            'sensor_data': sensors_data_buffer
+            'Station code': station_code,
+            'Sensors data': sensors_data_buffer
         }
         headers = {'Content-Type': 'application/json'}
         json_data = json.dumps(data)
-        response = requests.post(FLASK_SERVER_URL, data=json_data, headers=headers)
+        response = requests.post(flask_server_url, data=json_data, headers=headers)
 
         if response.status_code == 200:
             print("Data successfully sent to the Flask server.")
@@ -44,17 +44,17 @@ def on_message(client, userdata, msg):
     dict_payload = json.loads(json_payload)
 
     # Extract the data in the payload
-    sensor_type = dict_payload['sensor_type']
-    timestamp = dict_payload['timestamp']
-    value = dict_payload['value']
+    item_name = dict_payload['Item name']
+    measurement_date = dict_payload['Measurement date']
+    value = dict_payload['Value']
 
     # Change the format of the data
     sensor_data = {
-        'timestamp': timestamp,
-        'value': value
+        'Measurement date': measurement_date,
+        'Value': value
     }
     # Save the data in the buffer
-    sensors_data_buffer[sensor_type] = sensor_data
+    sensors_data_buffer[item_name] = sensor_data
 
     # Check if all sensors have sent the data
     if check_buffer_full():
@@ -91,13 +91,13 @@ def main():
         print("Usage: python script.py <station_id>")
         sys.exit(1)
 
-    global station_id
-    station_id = sys.argv[1]
+    global station_code
+    station_code = sys.argv[1]
 
     # MQTT broker details (local broker on the gateway)
     MQTT_BROKER = "localhost"
     MQTT_PORT = 1883
-    MQTT_TOPIC = f"station_{station_id}"
+    MQTT_TOPIC = f"station_{station_code}"
     MQTT_KEEPALIVE = 60
 
     # Set up MQTT client

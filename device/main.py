@@ -34,13 +34,13 @@ def read_sensor_data(file_path):
 
 
 # Function to publish data to the MQTT broker
-def publish_data(data, mqtt_client, MQTT_TOPIC):
+def publish_data(data, mqtt_client, mqtt_topic):
     try:
         # Convert the data to JSON format
         data_json = json.dumps(data)
 
         # Publish the data to the specified MQTT topic
-        mqtt_client.publish(MQTT_TOPIC, data_json)
+        mqtt_client.publish(mqtt_topic, data_json)
         print(f"Published data: {data_json}")
 
     except Exception as e:
@@ -48,8 +48,8 @@ def publish_data(data, mqtt_client, MQTT_TOPIC):
 
 
 # Function to simulate reading data and sending it via MQTT
-def simulate_sensor_data(station_id, item_id, mqtt_client, MQTT_TOPIC):
-    file_path = f"../data/station_{station_id}/station_{station_id}_item_{item_id}.csv"
+def simulate_sensor_data(station_id, item_code, mqtt_client, mqtt_topic):
+    file_path = f"../data/station_{station_id}/station_{station_id}_item_{item_code}.csv"
 
     if not os.path.exists(file_path):
         print(f"File {file_path} does not exist.")
@@ -66,39 +66,39 @@ def simulate_sensor_data(station_id, item_id, mqtt_client, MQTT_TOPIC):
         '9': 'PM2.5'
     }
 
-    sensor_type = item_dict[item_id]
+    item_name = item_dict[item_code]
 
     if sensor_data is not None:
         # Loop through each row of sensor data
         for index, row in sensor_data.iterrows():
             # Create a dictionary with the timestamp and value (simulate sensor data)
             data = {
-                'sensor_type': sensor_type,
-                'timestamp': row['Measurement date'],
-                'value': row['Average value']
+                'Item name': item_name,
+                'Measurement date': row['Measurement date'],
+                'Value': row['Average value']
             }
 
             # Publish the data to the MQTT broker
-            publish_data(data, mqtt_client, MQTT_TOPIC)
+            publish_data(data, mqtt_client, mqtt_topic)
 
             # Simulate a delay between sensor readings
-            time.sleep(10)
+            time.sleep(20)
 
 
 def main():
     if len(sys.argv) != 3:
-        print("Usage: python script.py <station_id> <item_id>")
+        print("Usage: python script.py <station_code> <item_code>")
         sys.exit(1)
 
     # Read command line arguments
-    station_id = sys.argv[1]
-    item_id = sys.argv[2]
+    station_code = sys.argv[1]
+    item_code = sys.argv[2]
 
     # MQTT broker details
-    MQTT_BROKER = "127.0.0.1"
-    MQTT_PORT = 1883
-    MQTT_TOPIC = f"station_{station_id}"
-    MQTT_KEEPALIVE = 60
+    mqtt_broker = '127.0.0.1'
+    mqtt_port = 1883
+    mqtt_topic = f'station_{station_code}'
+    mqtt_keepalive = 60
 
     # Initialize MQTT client
     mqtt_client = mqtt.Client()
@@ -110,19 +110,19 @@ def main():
 
     # Connect to the MQTT broker
     try:
-        mqtt_client.connect(MQTT_BROKER, MQTT_PORT, MQTT_KEEPALIVE)
-        print(f"Connected to MQTT broker at {MQTT_BROKER}")
+        mqtt_client.connect(mqtt_broker, mqtt_port, mqtt_keepalive)
+        print(f"Connected to MQTT broker at {mqtt_broker}")
     except Exception as e:
         print(f"Could not connect to MQTT broker: {e}")
         return
 
     # Simulate sending sensor data to the MQTT broker
-    simulate_sensor_data(station_id, item_id, mqtt_client, MQTT_TOPIC)
+    simulate_sensor_data(station_code, item_code, mqtt_client, mqtt_topic)
 
     # Disconnect from the MQTT broker
     mqtt_client.disconnect()
     print("Disconnected from MQTT broker.")
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

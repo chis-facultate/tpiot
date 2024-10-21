@@ -6,11 +6,47 @@
     <title>Seoul Stations Map</title>
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <!-- Socket.IO Client -->
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
     <!-- Custom styles -->
     <style>
         #map {
-            height: 600px;
+            height: 800px;
             width: 100%;
+        }
+        .custom-table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        .custom-table, .custom-table th, .custom-table td {
+            border: 1px solid black;
+        }
+        .custom-table th, .custom-table td {
+            padding: 8px;
+            text-align: left;
+        }
+        .custom-table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-top: 10px;
+            font-family: Arial, sans-serif;
+        }
+        .custom-table th,
+        .custom-table td {
+            border: 1px solid #ddd; /* Border color */
+            padding: 12px; /* Cell padding */
+            text-align: left; /* Text alignment */
+        }
+        .custom-table th {
+            background-color: #4CAF50; /* Header background color */
+            color: white; /* Header text color */
+            font-weight: bold; /* Bold text for header */
+        }
+        .custom-table tr:nth-child(even) {
+            background-color: #f2f2f2; /* Zebra striping for even rows */
+        }
+        .custom-table tr:hover {
+            background-color: #ddd; /* Hover effect */
         }
     </style>
 </head>
@@ -19,7 +55,6 @@
 
     <!-- Leaflet JavaScript -->
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-    <!-- Add a script to get station data and plot it on the map -->
     <script>
         // Initialize the map centered at Seoul
         var map = L.map('map').setView([37.5665, 126.9780], 11); // Center at Seoul
@@ -29,29 +64,102 @@
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
 
-        // Fetch station data from the Flask server
+        // Initialize Socket.IO
+        var socket = io.connect('http://localhost:5000'); // Adjust the URL to your Flask server
+
+        // Store markers in an object to easily update them later
+        var markers = {};
+
+        // Fetch initial station data from the Flask server
         fetch('/stations')
             .then(response => response.json())
             .then(data => {
                 // Loop through station data and place markers on the map
                 data.forEach(station => {
-                    const stationCode = station['Station code']
+                    const stationCode = station['Station code'];
                     const stationName = station['Station name'];
                     const address = station['Address'];
-                    const lat = station.Latitude;
-                    const lng = station.Longitude;
-                    
+                    const lat = station['Latitude'];
+                    const lng = station['Longitude'];
 
-                    // Create a marker for each station
-                    var marker = L.marker([lat, lng]).addTo(map);
+                    // Create a marker for each station with a default color
+                    var marker = L.marker([lat, lng], { icon: getMarkerIcon(-1) }).addTo(map); // Default (turned off station)
 
-                    // Add a popup to each marker (when marker is clicked then display details about the station)
-                    marker.bindPopup(`<b>${stationCode}</b><br><b>${stationName}</b><br>${address}`).openPopup();
+                    // Store marker in the markers object
+                    markers[stationCode] = marker;
+
+                    // Add a popup to each marker (display details about the station)
+                    marker.bindPopup(`<b>${stationCode}</b><br><b>${stationName}</b><br>${address}`);
+
+                    // Set up a listener for WebSocket messages to update pop-ups
+                    socket.on('update_station_data', function(updatedStationData) {
+
+                        // console.log('Received data:', updatedStationData);
+
+                        // Check if the updated data corresponds to this station
+                        const updatedStationCode = updatedStationData['Station code'];
+                        if (updatedStationCode == stationCode) {
+                            
+                            // Update the pop-up with a table showing sensor data
+                            const updatedSensorsData = updatedStationData['Sensors data'];
+                            marker.setPopupContent(
+                                `<b>${stationCode}</b><br><b>${stationName}</b><br>${address}<br>${generateSensorTable(updatedSensorsData)}`
+                            );
+                            // Change marker icon based on AQI value
+                            const aqi = updatedStationData['AQI']
+                            marker.setIcon(getMarkerIcon(aqi));
+                        }
+                    });
                 });
             })
             .catch(error => {
                 console.error('Error fetching station data:', error);
             });
+
+        // Function to get marker icon based on AQI value
+        function getMarkerIcon(aqi) {
+            let color;
+            if (aqi == -1 || aqi == null){
+                color = 'black'; // Default (turned off station)
+            } else if (aqi <= 50) {
+                color = 'blue'; // Good
+            } else if (aqi <= 100) {
+                color = 'green'; // Moderate
+            } else if (aqi <= 150) {
+                color = 'yellow'; // Unhealthy for sensitive groups
+            } else {
+                color = 'red'; // Unhealthy
+            }
+            return L.divIcon({
+                className: 'custom-marker',
+                html: `<div style="background-color: ${color}; border-radius: 50%; width: 20px; height: 20px;"></div>`,
+                iconSize: [20, 20]
+            });
+        }
+
+        // Function to generate an HTML table for sensor data
+        function generateSensorTable(sensorsData) {
+            // Beggining of the table
+            let table = `
+                        <table class="custom-table">
+                            <thead>
+                                <tr>
+                                    <th>Sensor Type</th>
+                                    <th>Value</th>
+                                    <th>Measurement Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>`;
+            // Dinamic content in the table
+            const sensors = Object.keys(sensorsData);
+            sensors.forEach(sensor => { // sensor is the sensor name and the key in the dictionary containing the data collected by that sensor
+                let sensorData = sensorsData[sensor];
+                table += `<tr><td>${sensor}</td><td>${sensorData['Value']}</td><td>${sensorData['Measurement date']}</td></tr>`;
+            });
+            // End of the table
+            table += '</tbody></table>';
+            return table;
+        }
     </script>
 </body>
 </html>
