@@ -1,13 +1,37 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
+import csv
 
-# Create a Flask app instance
-app = Flask(__name__)
+# Global variables
+app = Flask(__name__)  # Flask app instance
+station_data = []
+
+
+# Function to read station data from a CSV file
+def load_stations_data(file_path):
+    global station_data
+    with open(file_path, newline='', encoding='utf-8') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            station_data.append({
+                "Station code": row['Station code'],
+                "Station name": row['Station name(district)'],
+                "Address": row['Address'],
+                "Latitude": float(row['Latitude']),
+                "Longitude": float(row['Longitude'])
+            })
+    print("Station data loaded successfully.")
+    print(station_data)
 
 
 # Endpoints
 @app.route('/', methods=['GET'])
-def home():
-    return "Hello, World!"
+def index():
+    return render_template('index.html')
+
+
+@app.route('/stations', methods=['GET'])
+def get_stations():
+    return jsonify(station_data)
 
 
 @app.route('/data', methods=['POST'])
@@ -30,6 +54,13 @@ def receive_data():
         return jsonify({"message": f"Error receiving data: {e}"}), 500
 
 
-# Run the Flask app
-if __name__ == '__main__':
+def main():
+    # Load stations data (id, name, locations)
+    file_path = './data/Measurement_station_info.csv'
+    load_stations_data(file_path)
+    # Run Flask server
     app.run(debug=True)
+
+
+if __name__ == '__main__':
+    main()

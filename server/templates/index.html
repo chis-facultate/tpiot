@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seoul Stations Map</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <!-- Custom styles -->
+    <style>
+        #map {
+            height: 600px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+
+    <!-- Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <!-- Add a script to get station data and plot it on the map -->
+    <script>
+        // Initialize the map centered at Seoul
+        var map = L.map('map').setView([37.5665, 126.9780], 11); // Center at Seoul
+
+        // Add OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // Fetch station data from the Flask server
+        fetch('/stations')
+            .then(response => response.json())
+            .then(data => {
+                // Loop through station data and place markers on the map
+                data.forEach(station => {
+                    const stationCode = station['Station code']
+                    const stationName = station['Station name'];
+                    const address = station['Address'];
+                    const lat = station.Latitude;
+                    const lng = station.Longitude;
+                    
+
+                    // Create a marker for each station
+                    var marker = L.marker([lat, lng]).addTo(map);
+
+                    // Add a popup to each marker (when marker is clicked then display details about the station)
+                    marker.bindPopup(`<b>${stationCode}</b><br><b>${stationName}</b><br>${address}`).openPopup();
+                });
+            })
+            .catch(error => {
+                console.error('Error fetching station data:', error);
+            });
+    </script>
+</body>
+</html>
