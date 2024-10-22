@@ -58,15 +58,34 @@ def simulate_sensor_data(station_id, item_code, mqtt_client, mqtt_topic):
     sensor_data = read_sensor_data(file_path)
 
     item_dict = {
-        '1': 'SO2',
-        '3': 'NO2',
-        '5': 'CO',
-        '6': 'O3',
-        '8': 'PM10',
-        '9': 'PM2.5'
+        '1': {
+            'Item name': 'SO2',
+            'Unit of measurement': 'ppm'
+              },
+        '3': {
+            'Item name': 'NO2',
+            'Unit of measurement': 'ppm'
+              },
+        '5': {
+            'Item name': 'CO',
+            'Unit of measurement': 'ppm'
+              },
+        '6': {
+            'Item name': 'O3',
+            'Unit of measurement': 'ppm'
+              },
+        '8': {
+            'Item name': 'PM10',
+            'Unit of measurement': 'microgram/m3'
+              },
+        '9': {
+            'Item name': 'PM2.5',
+            'Unit of measurement': 'microgram/m3'
+              }
     }
 
-    item_name = item_dict[item_code]
+    item_name = item_dict[item_code]['Item name']
+    measurement_unit = item_dict[item_code]['Unit of measurement']
 
     if sensor_data is not None:
         # Loop through each row of sensor data
@@ -74,8 +93,9 @@ def simulate_sensor_data(station_id, item_code, mqtt_client, mqtt_topic):
             # Create a dictionary with the timestamp and value (simulate sensor data)
             data = {
                 'Item name': item_name,
-                'Measurement date': row['Measurement date'],
-                'Value': row['Average value']
+                'Value': row['Average value'],
+                'Measurement unit': measurement_unit,
+                'Measurement date': row['Measurement date']
             }
 
             # Publish the data to the MQTT broker
@@ -83,6 +103,8 @@ def simulate_sensor_data(station_id, item_code, mqtt_client, mqtt_topic):
 
             # Simulate a delay between sensor readings
             time.sleep(20)
+    else:
+        print('End of file')
 
 
 def main():

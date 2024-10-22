@@ -20,14 +20,15 @@ def check_buffer_full():
 # Forward data to Flask server in the cloud
 def forward_data():
     try:
-        data = {
+        station_data = {
             'Station code': station_code,
             'Sensors data': sensors_data_buffer
         }
         headers = {'Content-Type': 'application/json'}
-        json_data = json.dumps(data)
-        response = requests.post(flask_server_url, data=json_data, headers=headers)
+        json_station_data = json.dumps(station_data)  # Convert to JSON
+        response = requests.post(flask_server_url, data=json_station_data, headers=headers)
 
+        print('Sent data', json_station_data)
         if response.status_code == 200:
             print("Data successfully sent to the Flask server.")
         else:
@@ -45,13 +46,15 @@ def on_message(client, userdata, msg):
 
     # Extract the data in the payload
     item_name = dict_payload['Item name']
-    measurement_date = dict_payload['Measurement date']
     value = dict_payload['Value']
+    measurement_unit = dict_payload['Measurement unit']
+    measurement_date = dict_payload['Measurement date']
 
     # Change the format of the data
     sensor_data = {
-        'Measurement date': measurement_date,
-        'Value': value
+        'Value': value,
+        'Measurement unit': measurement_unit,
+        'Measurement date': measurement_date
     }
     # Save the data in the buffer
     sensors_data_buffer[item_name] = sensor_data

@@ -14,37 +14,38 @@
             height: 800px;
             width: 100%;
         }
+        .leaflet-popup-content {
+            /* Remove max-width and max-height constraints to let the popup auto-size based on content */
+            width: auto;
+            height: auto;
+            overflow: visible;  /* Disable scrolling entirely */
+            white-space: normal;  /* Allow content to wrap to new lines */
+        }
         .custom-table {
-            border-collapse: collapse;
-            width: 100%;
+            width: 100%; /* Take the full width of the popup */
+            table-layout: auto; /* Auto layout so table columns can expand naturally */
+            word-wrap: break-word; /* Ensure long words break and wrap within cells */
         }
         .custom-table, .custom-table th, .custom-table td {
             border: 1px solid black;
         }
+
         .custom-table th, .custom-table td {
-            padding: 8px;
-            text-align: left;
-        }
-        .custom-table {
-            border-collapse: collapse;
-            width: 100%;
-            margin-top: 10px;
-            font-family: Arial, sans-serif;
-        }
-        .custom-table th,
-        .custom-table td {
-            border: 1px solid #ddd; /* Border color */
-            padding: 12px; /* Cell padding */
-            text-align: left; /* Text alignment */
+            border: 1px solid #ddd; /* Border for table cells */
+            padding: 8px;           /* Padding for table cells */
+            text-align: center;      /* Align text to the center */
+            font-size: 12px;        /* Smaller font size to fit more content */
         }
         .custom-table th {
-            background-color: #4CAF50; /* Header background color */
-            color: white; /* Header text color */
+            background-color: #f2f2f2; /* Header background color */
+            color: black; /* Header text color */
             font-weight: bold; /* Bold text for header */
         }
+
         .custom-table tr:nth-child(even) {
             background-color: #f2f2f2; /* Zebra striping for even rows */
         }
+
         .custom-table tr:hover {
             background-color: #ddd; /* Hover effect */
         }
@@ -83,7 +84,7 @@
                     const lng = station['Longitude'];
 
                     // Create a marker for each station with a default color
-                    var marker = L.marker([lat, lng], { icon: getMarkerIcon(-1) }).addTo(map); // Default (turned off station)
+                    var marker = L.marker([lat, lng], { icon: getMarkerIcon() }).addTo(map); // Default (turned off station)
 
                     // Store marker in the markers object
                     markers[stationCode] = marker;
@@ -103,11 +104,11 @@
                             // Update the pop-up with a table showing sensor data
                             const updatedSensorsData = updatedStationData['Sensors data'];
                             marker.setPopupContent(
-                                `<b>${stationCode}</b><br><b>${stationName}</b><br>${address}<br>${generateSensorTable(updatedSensorsData)}`
+                                `<b>${stationCode}</b><br><b>${stationName}</b><br>${address}<br>${generateTable(updatedSensorsData)}`
                             );
                             // Change marker icon based on AQI value
-                            const aqi = updatedStationData['AQI']
-                            marker.setIcon(getMarkerIcon(aqi));
+                            const {maxAqi, maxAqiColor} = getMaxAqiAndColor(updatedSensorsData);
+                            marker.setIcon(getMarkerIcon(maxAqi, maxAqiColor));
                         }
                     });
                 });
@@ -116,47 +117,81 @@
                 console.error('Error fetching station data:', error);
             });
 
-        // Function to get marker icon based on AQI value
-        function getMarkerIcon(aqi) {
-            let color;
-            if (aqi == -1 || aqi == null){
-                color = 'black'; // Default (turned off station)
-            } else if (aqi <= 50) {
-                color = 'blue'; // Good
-            } else if (aqi <= 100) {
-                color = 'green'; // Moderate
-            } else if (aqi <= 150) {
-                color = 'yellow'; // Unhealthy for sensitive groups
-            } else {
-                color = 'red'; // Unhealthy
+        // Function to get marker icon based on AQI value and color
+        function getMarkerIcon(maxAqi = undefined, maxAqiColor = undefined) {
+            // Default color if none provided
+            if (maxAqiColor == undefined) {
+                maxAqiColor = 'black'; // Default (turned off station)
             }
+
+            // Display AQI inside the marker
+            const aqiDisplay = (maxAqi == undefined) ? '' : maxAqi; // Show AQI if it's defined, otherwise empty
+
             return L.divIcon({
                 className: 'custom-marker',
-                html: `<div style="background-color: ${color}; border-radius: 50%; width: 20px; height: 20px;"></div>`,
-                iconSize: [20, 20]
+                html: `
+                    <div style="
+                        background-color: ${maxAqiColor};
+                        border-radius: 50%;
+                        width: 40px;
+                        height: 40px;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        color: black;
+                        font-weight: bold;
+                        font-size: 14px;
+                    ">
+                        ${aqiDisplay}
+                    </div>`,
+                iconSize: [40, 40]  // Adjust size to fit the AQI text inside the marker
             });
         }
 
-        // Function to generate an HTML table for sensor data
-        function generateSensorTable(sensorsData) {
-            // Beggining of the table
-            let table = `
-                        <table class="custom-table">
-                            <thead>
-                                <tr>
-                                    <th>Sensor Type</th>
-                                    <th>Value</th>
-                                    <th>Measurement Date</th>
-                                </tr>
-                            </thead>
-                            <tbody>`;
-            // Dinamic content in the table
-            const sensors = Object.keys(sensorsData);
-            sensors.forEach(sensor => { // sensor is the sensor name and the key in the dictionary containing the data collected by that sensor
-                let sensorData = sensorsData[sensor];
-                table += `<tr><td>${sensor}</td><td>${sensorData['Value']}</td><td>${sensorData['Measurement date']}</td></tr>`;
+
+        function getMaxAqiAndColor(sensorsData){
+            const items = Object.keys(sensorsData);
+            let maxAqi = sensorsData[items[0]]['AQI'];
+            let maxAqiColor = sensorsData[items[0]]['Color'];
+            items.forEach(sensor => {
+                const item_aqi = sensorsData[sensor]['AQI'];
+                if (item_aqi > maxAqi){
+                    maxAqi = item_aqi;
+                    maxAqiColor = sensorsData[sensor]['Color'];
+                }
             });
-            // End of the table
+            return {maxAqi, maxAqiColor};
+        }
+
+        // Function to generate an HTML table for sensor data
+        function generateTable(sensorsData) {
+            let table = `
+                <table class="custom-table">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Value</th>
+                            <th>Unit</th>
+                            <th>Timestamp</th>
+                            <th>AQI</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+            // Dynamic content in the table
+            const sensors = Object.keys(sensorsData);
+            sensors.forEach(sensor => {
+                let sensorData = sensorsData[sensor];
+                const aqi = sensorData['AQI'];
+                const aqiColor = sensorData['Color']; // Get color for AQI background
+                table += `
+                    <tr>
+                        <td>${sensor}</td>
+                        <td>${sensorData['Value']}</td>
+                        <td>${sensorData['Measurement unit']}</td>
+                        <td>${sensorData['Measurement date']}</td>
+                        <td class="aqi-cell" style="background-color: ${aqiColor};">${aqi}</td>
+                    </tr>`;
+            });
             table += '</tbody></table>';
             return table;
         }
