@@ -7,6 +7,7 @@ import csv
 app = Flask(__name__)  # Flask app instance
 socketio = SocketIO(app)
 stations_data = []
+last_read_values = {}
 items_data_dict = {}
 # AQI thresholds
 minimum_aqi = 0
@@ -137,6 +138,11 @@ def get_stations():
     return jsonify(stations_data)
 
 
+@app.route('/last_read_values', methods=['GET'])
+def get_last_read_values():
+    return jsonify(last_read_values)
+
+
 # Receive data from the POST request and forward it to WebSocket clients
 @app.route('/data', methods=['POST'])
 def receive_data():
@@ -159,11 +165,14 @@ def receive_data():
     # Send the processed data to the client using WebSocket
     try:
         socketio.emit('update_station_data', aqi_dict)
+        print(f'Data forwarded: {aqi_dict}')
     except Exception as e:
         print(f'Error forwarding data: {e}')
         return jsonify({'status': 'error', 'message': 'Failed to forward data'}), 500
 
-    print('Data forwarded')
+    station_code = aqi_dict['Station code']
+    global last_read_values
+    last_read_values[station_code] = aqi_dict['Sensors data']
 
     # Return a successful response to the gateway
     return jsonify({'status': 'success', 'message': 'Data received and forwarded to client'}), 200

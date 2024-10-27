@@ -71,20 +71,31 @@
         // Store markers in an object to easily update them later
         var markers = {};
 
-        // Fetch initial station data from the Flask server
-        fetch('/stations')
-            .then(response => response.json())
-            .then(data => {
+        // Fetch station data from the Flask server
+        Promise.all([
+            fetch('/stations').then(response => {
+                if (!response.ok) throw new Error('Failed to fetch /stations');
+                return response.json()
+            }),
+            fetch('/last_read_values').then(response => {
+                if (!response.ok) throw new Error('Failed to fetch /last_read_values');
+                return response.json();
+            })
+        ])
+            .then(([stationsData, lastReadValues]) => {
                 // Loop through station data and place markers on the map
-                data.forEach(station => {
+                stationsData.forEach(station => {
                     const stationCode = station['Station code'];
                     const stationName = station['Station name'];
                     const address = station['Address'];
                     const lat = station['Latitude'];
                     const lng = station['Longitude'];
 
+                    const sensorsData = lastReadValues[stationCode];
+                    const {maxAqi, maxAqiColor} = getMaxAqiAndColor(sensorsData);
+
                     // Create a marker for each station with a default color
-                    var marker = L.marker([lat, lng], { icon: getMarkerIcon() }).addTo(map); // Default (turned off station)
+                    var marker = L.marker([lat, lng], { icon: getMarkerIcon(maxAqi, maxAqiColor) }).addTo(map); // Default (turned off station)
 
                     // Store marker in the markers object
                     markers[stationCode] = marker;
@@ -112,9 +123,6 @@
                         }
                     });
                 });
-            })
-            .catch(error => {
-                console.error('Error fetching station data:', error);
             });
 
         // Function to get marker icon based on AQI value and color
@@ -150,6 +158,9 @@
 
 
         function getMaxAqiAndColor(sensorsData){
+            if (sensorsData == undefined){
+                return {undefined, undefined}
+            }
             const items = Object.keys(sensorsData);
             let maxAqi = sensorsData[items[0]]['AQI'];
             let maxAqiColor = sensorsData[items[0]]['Color'];
