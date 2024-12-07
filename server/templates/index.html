@@ -66,6 +66,7 @@
         }).addTo(map);
 
         const deploymentUrl = 'https://tpiot-1.onrender.com';
+        // const deploymentUrl = 'http://localhost:5000';
 
         // Initialize Socket.IO
         var socket = io.connect(deploymentUrl, {transports: ["websocket", "polling"]});
