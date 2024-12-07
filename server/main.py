@@ -4,14 +4,12 @@ import os
 import copy
 from flask import Flask, request, jsonify, render_template
 from flask_socketio import SocketIO
-import csv
 
 # Global variables
 app = Flask(__name__)  # Flask app instance
 socketio = SocketIO(app)
-stations_data = []
 last_read_values = {}
-items_data_dict = {}
+
 # AQI thresholds
 minimum_aqi = 0
 good_aqi_high = 50
@@ -19,38 +17,193 @@ normal_aqi_high = 100
 bad_aqi_high = 250
 maximum_aqi = 500
 
+# Data
+stations_data = [
+  {
+    "Station code": 101,
+    "Station name": "Jongno-gu",
+    "Address": "19, Jong-ro 35ga-gil, Jongno-gu, Seoul, Republic of Korea",
+    "Latitude": 37.572016399999995,
+    "Longitude": 127.00500749999999
+  },
+  {
+    "Station code": 102,
+    "Station name": "Jung-gu",
+    "Address": "15, Deoksugung-gil, Jung-gu, Seoul, Republic of Korea",
+    "Latitude": 37.564262899999996,
+    "Longitude": 126.97467569999999
+  },
+  {
+    "Station code": 103,
+    "Station name": "Yongsan-gu",
+    "Address": "136, Hannam-daero, Yongsan-gu, Seoul, Republic of Korea",
+    "Latitude": 37.540032700000005,
+    "Longitude": 127.00485
+  },
+  {
+    "Station code": 104,
+    "Station name": "Eunpyeong-gu",
+    "Address": "215, Jinheung-ro, Eunpyeong-gu, Seoul, Republic of Korea",
+    "Latitude": 37.6098232,
+    "Longitude": 126.9348476
+  },
+  {
+    "Station code": 105,
+    "Station name": "Seodaemun-gu",
+    "Address": "32, Segeomjeong-ro 4-gil, Seodaemun-gu, Seoul, Republic of Korea",
+    "Latitude": 37.5937421,
+    "Longitude": 126.9496787
+  },
+  {
+    "Station code": 106,
+    "Station name": "Mapo-gu",
+    "Address": "10, Poeun-ro 6-gil, Mapo-gu, Seoul, Republic of Korea",
+    "Latitude": 37.555580299999995,
+    "Longitude": 126.90559750000001
+  },
+  {
+    "Station code": 107,
+    "Station name": "Seongdong-gu",
+    "Address": "18, Ttukseom-ro 3-gil, Seongdong-gu, Seoul, Republic of Korea",
+    "Latitude": 37.541864200000006,
+    "Longitude": 127.04965890000001
+  },
+  {
+    "Station code": 108,
+    "Station name": "Gwangjin-gu",
+    "Address": "571, Gwangnaru-ro, Gwangjin-gu, Seoul, Republic of Korea",
+    "Latitude": 37.547180299999994,
+    "Longitude": 127.0924929
+  },
+  {
+    "Station code": 109,
+    "Station name": "Dongdaemun-gu",
+    "Address": "43, Cheonho-daero 13-gil, Dongdaemun-gu, Seoul, Republic of Korea",
+    "Latitude": 37.57574279999999,
+    "Longitude": 127.0288848
+  },
+  {
+    "Station code": 110,
+    "Station name": "Jungnang-gu",
+    "Address": "369, Yongmasan-ro, Jungnang-gu, Seoul, Republic of Korea",
+    "Latitude": 37.5848485,
+    "Longitude": 127.0940229
+  },
+  {
+    "Station code": 111,
+    "Station name": "Seongbuk-gu",
+    "Address": "70, Samyang-ro 2-gil, Seongbuk-gu, Seoul, Republic of Korea",
+    "Latitude": 37.606718900000004,
+    "Longitude": 127.0272794
+  },
+  {
+    "Station code": 112,
+    "Station name": "Gangbuk-gu",
+    "Address": "49, Samyang-ro 139-gil, Gangbuk-gu, Seoul, Republic of Korea",
+    "Latitude": 37.6479299,
+    "Longitude": 127.01195179999999
+  },
+  {
+    "Station code": 113,
+    "Station name": "Dobong-gu",
+    "Address": "34, Sirubong-ro 2-gil, Dobong-gu, Seoul, Republic of Korea",
+    "Latitude": 37.6541919,
+    "Longitude": 127.0290879
+  },
+  {
+    "Station code": 114,
+    "Station name": "Nowon-gu",
+    "Address": "17, Sanggye-ro 23-gil, Nowon-gu, Seoul, Republic of Korea",
+    "Latitude": 37.6587743,
+    "Longitude": 127.0685054
+  },
+  {
+    "Station code": 115,
+    "Station name": "Yangcheon-gu",
+    "Address": "56, Jungang-ro 52-gil, Yangcheon-gu, Seoul, Republic of Korea",
+    "Latitude": 37.5259388,
+    "Longitude": 126.85660290000001
+  },
+  {
+    "Station code": 116,
+    "Station name": "Gangseo-gu",
+    "Address": "71, Gangseo-ro 45da-gil, Gangseo-gu, Seoul, Republic of Korea",
+    "Latitude": 37.54464,
+    "Longitude": 126.8351506
+  },
+  {
+    "Station code": 117,
+    "Station name": "Guro-gu",
+    "Address": "45, Gamasan-ro 27-gil, Guro-gu, Seoul, Republic of Korea",
+    "Latitude": 37.498498100000006,
+    "Longitude": 126.88969240000002
+  },
+  {
+    "Station code": 118,
+    "Station name": "Geumcheon-gu",
+    "Address": "20, Geumha-ro 21-gil, Geumcheon-gu, Seoul, Republic of Korea",
+    "Latitude": 37.4523569,
+    "Longitude": 126.9082956
+  },
+  {
+    "Station code": 119,
+    "Station name": "Yeongdeungpo-gu",
+    "Address": "11, Yangsan-ro 23-gil, Yeongdeungpo-gu, Seoul, Republic of Korea",
+    "Latitude": 37.5250065,
+    "Longitude": 126.89737050000001
+  },
+  {
+    "Station code": 120,
+    "Station name": "Dongjak-gu",
+    "Address": "6, Sadang-ro 16a-gil, Dongjak-gu, Seoul, Republic of Korea",
+    "Latitude": 37.4809167,
+    "Longitude": 126.9714807
+  },
+  {
+    "Station code": 121,
+    "Station name": "Gwanak-gu",
+    "Address": "14, Sillimdong-gil, Gwanak-gu, Seoul, Republic of Korea",
+    "Latitude": 37.4873546,
+    "Longitude": 126.927102
+  },
+  {
+    "Station code": 122,
+    "Station name": "Seocho-gu",
+    "Address": "16, Sinbanpo-ro 15-gil, Seocho-gu, Seoul, Republic of Korea",
+    "Latitude": 37.5045471,
+    "Longitude": 126.99445779999999
+  },
+  {
+    "Station code": 123,
+    "Station name": "Gangnam-gu",
+    "Address": "426, Hakdong-ro, Gangnam-gu, Seoul, Republic of Korea",
+    "Latitude": 37.5175282,
+    "Longitude": 127.0474699
+  },
+  {
+    "Station code": 124,
+    "Station name": "Songpa-gu",
+    "Address": "236, Baekjegobun-ro, Songpa-gu, Seoul, Republic of Korea",
+    "Latitude": 37.5026857,
+    "Longitude": 127.0925092
+  },
+  {
+    "Station code": 125,
+    "Station name": "Gangdong-gu",
+    "Address": "59, Gucheonmyeon-ro 42-gil, Gangdong-gu, Seoul, Republic of Korea",
+    "Latitude": 37.5449625,
+    "Longitude": 127.13679170000002
+  }
+]
 
-# Function to read station data from a CSV file
-def load_stations_data(file_path):
-    global stations_data
-    with open(file_path, newline='', encoding='utf-8') as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            stations_data.append({
-                'Station code': row['Station code'],
-                'Station name': row['Station name(district)'],
-                'Address': row['Address'],
-                'Latitude': float(row['Latitude']),
-                'Longitude': float(row['Longitude'])
-            })
-    print('Station data loaded successfully.')
-    print(stations_data)
-
-
-def load_item_data(file_path):
-    global items_data_dict
-    with open(file_path, newline='', encoding='utf-8') as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            item_name = row['Item name']
-            items_data_dict[item_name] = {
-                'Good': float(row['Good(Blue)']),
-                'Normal': float(row['Normal(Green)']),
-                'Bad': float(row['Bad(Yellow)']),
-                'Very bad': float(row['Very bad(Red)'])
-            }
-    print('Item data loaded successfully.')
-    print(items_data_dict)
+items_data_dict = {
+    'SO2': {'Good': 0.02, 'Normal': 0.05, 'Bad': 0.15, 'Very bad': 1.0},
+    'NO2': {'Good': 0.03, 'Normal': 0.06, 'Bad': 0.2, 'Very bad': 2.0},
+    'CO': {'Good': 2.0, 'Normal': 9.0, 'Bad': 15.0, 'Very bad': 50.0},
+    'O3': {'Good': 0.03, 'Normal': 0.09, 'Bad': 0.15, 'Very bad': 0.5},
+    'PM10': {'Good': 30.0, 'Normal': 80.0, 'Bad': 150.0, 'Very bad': 500.0},
+    'PM2.5': {'Good': 15.0, 'Normal': 35.0, 'Bad': 75.0, 'Very bad': 500.0}
+}
 
 
 # Calculates aqi for a certain pollutant
@@ -198,12 +351,6 @@ def handle_disconnect():
 
 
 def main():
-    # Load stations data (id, name, locations)
-    base_path = os.path.abspath(os.path.dirname(__file__))
-    stations_data_file_path = os.path.join(base_path, 'data', 'Measurement_station_info.csv')
-    items_data_file_path = os.path.join(base_path, 'data', 'Measurement_item_info.csv')
-    load_stations_data(stations_data_file_path)
-    load_item_data(items_data_file_path)
     # Run Flask server
     socketio.run(app, host='127.0.0.1', port='5000', debug=True, allow_unsafe_werkzeug=True)
 
