@@ -68,7 +68,7 @@
         const deploymentUrl = 'https://tpiot-1.onrender.com';
 
         // Initialize Socket.IO
-        var socket = io.connect('wss://tpiot-1.onrender.com');
+        var socket = io.connect(deploymentUrl, {transports: ["websocket", "polling"]});
 
         // Store markers in an object to easily update them later
         var markers = {};
