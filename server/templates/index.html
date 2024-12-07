@@ -68,7 +68,7 @@
         const deploymentUrl = 'https://tpiot-1.onrender.com';
 
         // Initialize Socket.IO
-        var socket = io.connect(deploymentUrl); // Adjust the URL to your Flask server
+        var socket = io.connect('wss://tpiot-1.onrender.com');
 
         // Store markers in an object to easily update them later
         var markers = {};
