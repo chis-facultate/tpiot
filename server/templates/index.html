@@ -65,19 +65,21 @@
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
 
+        const deploymentUrl = 'https://tpiot-1.onrender.com';
+
         // Initialize Socket.IO
-        var socket = io.connect('http://localhost:5000'); // Adjust the URL to your Flask server
+        var socket = io.connect(deploymentUrl); // Adjust the URL to your Flask server
 
         // Store markers in an object to easily update them later
         var markers = {};
 
         // Fetch station data from the Flask server
         Promise.all([
-            fetch('/stations').then(response => {
+            fetch(deploymentUrl + '/stations').then(response => {
                 if (!response.ok) throw new Error('Failed to fetch /stations');
                 return response.json()
             }),
-            fetch('/last_read_values').then(response => {
+            fetch(deploymentUrl + '/last_read_values').then(response => {
                 if (!response.ok) throw new Error('Failed to fetch /last_read_values');
                 return response.json();
             })
