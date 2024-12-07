@@ -1,5 +1,6 @@
 import eventlet
 eventlet.monkey_patch()  # This must be called before any other imports
+import os
 import copy
 from flask import Flask, request, jsonify, render_template
 from flask_socketio import SocketIO
@@ -198,12 +199,12 @@ def handle_disconnect():
 
 def main():
     # Load stations data (id, name, locations)
-    stations_data_file_path = './data/Measurement_station_info.csv'
-    items_data_file_path = './data/Measurement_item_info.csv'
+    base_path = os.path.abspath(os.path.dirname(__file__))
+    stations_data_file_path = os.path.join(base_path, 'data', 'Measurement_station_info.csv')
+    items_data_file_path = os.path.join(base_path, 'data', 'Measurement_item_info.csv')
     load_stations_data(stations_data_file_path)
     load_item_data(items_data_file_path)
     # Run Flask server
-    # app.run(debug=True)
     socketio.run(app, host='127.0.0.1', port='5000', debug=True, allow_unsafe_werkzeug=True)
 
 
