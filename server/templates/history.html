@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Station History</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Socket.IO Client -->
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+    #chart-container {
+        position: relative; /* Ensures proper layering */
+        overflow-x: auto;  /* Enables horizontal scrolling */
+        width: 100%;       /* Full width container */
+        max-width: 100%;
+        margin: 20px auto;
+    }
+
+    canvas {
+        display: block;
+        margin: 0 auto;
+    }
+    </style>
+</head>
+<body>
+    <p id="station-title"></p>
+    <div id="chart-container">
+        <div style="overflow-x: auto; white-space: nowrap;">
+            <canvas id="history-chart" style="min-width: 100%;"></canvas>
+        </div>
+    </div>
+
+    <script>
+        const deploymentUrl = 'https://tpiot-1.onrender.com';
+        // const deploymentUrl = 'http://localhost:5000';  // Change to your backend URL
+        const stationCode = new URLSearchParams(window.location.search).get('stationCode');
+
+        const customColors = [
+            'rgba(128, 0, 128, 0.6)',    // Purple
+            'rgba(255, 140, 0, 0.6)',    // Dark Orange
+            'rgba(105, 105, 105, 0.6)',  // Dim Gray
+            'rgba(72, 61, 139, 0.6)',    // Dark Slate Blue
+            'rgba(210, 105, 30, 0.6)',   // Chocolate
+            'rgba(119, 136, 153, 0.6)',  // Light Slate Gray
+            'rgba(139, 0, 139, 0.6)'     // Dark Magenta
+        ];
+
+        let documents = [];
+        let datasets = [];
+        let dateTimeList = [];
+        let chartInstance = null;
+
+        // Helper function to get a consistent color for datasets
+        function getColor(index) {
+            return customColors[index % customColors.length];
+        }
+
+        // Initialize datasets from documents
+        function initDatasets() {
+            if (!documents || documents.length === 0) {
+                console.error('No data available to initialize datasets.');
+                return; // Exit if no data available
+            }
+
+            datasets = [];  // Reset datasets
+            const items = Object.keys(documents[0]).filter(key => key !== 'Measurement date'); // Remove 'Measurement date' key
+
+            // Add datasets for each item (e.g., SO2, NO2)
+            items.forEach((item, index) => {
+                const data = documents.map(doc => doc[item].AQI); // Extract AQI values for each item (e.g., SO2, NO2)
+
+                datasets.push({
+                    label: item,
+                    data: data,
+                    backgroundColor: getColor(index),
+                    borderColor: getColor(index),
+                    borderWidth: 2,
+                    fill: false,
+                });
+            });
+
+            // Add dataset for the worst AQI (maximum AQI from all sensors per record)
+            const worstAqiData = documents.map(doc => {
+                return Math.max(...items.map(item => doc[item].AQI)); // Get the maximum AQI value for each record across all sensors
+            });
+
+            // Add the worst AQI dataset
+            datasets.push({
+                label: 'Worst AQI',
+                data: worstAqiData,
+                backgroundColor: 'rgba(255, 0, 0, 0.6)', // Red for emphasis
+                borderColor: 'rgba(255, 0, 0, 1)',
+                borderWidth: 2,
+                borderDash: [5, 5], // Dashed line for distinction
+                fill: false,
+            });
+        }
+
+        // Initialize the dateTimeList from documents
+        function initDateTimeList() {
+            if (!documents || documents.length === 0) {
+                console.error('No data available to initialize DateTime List.');
+                return; // Exit if no data available
+            }
+
+            dateTimeList = documents.map(doc => doc.SO2["Measurement date"]); // Extract 'Measurement date' from SO2 (or use any sensor)
+        }
+
+        // Fetch data from the backend and initialize chart
+        async function fetchStationData() {
+            try {
+                const response = await fetch(deploymentUrl + `/history_data/${stationCode}`);
+                documents = await response.json();
+                if (documents.length === 0) {
+                    console.error('No data found for this station.');
+                    return; // Exit if no data is fetched
+                }
+                console.log('Initial documents:', documents);
+                initDatasets();
+                initDateTimeList();
+                renderChart();
+            } catch (error) {
+                console.error('Error fetching data:', error);
+            }
+        }
+
+        // Render or update the chart
+        function renderChart() {
+            if (documents.length == 0) {
+                console.log('No documents to render');
+            }
+
+            const ctx = document.getElementById('history-chart').getContext('2d');
+            const chartOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top', // Ensures legend is accessible
+                        onClick: (e, legendItem, legend) => {
+                            // Custom legend click logic (if required)
+                            const index = legendItem.datasetIndex;
+                            const meta = legend.chart.getDatasetMeta(index);
+
+                            // Toggle dataset visibility
+                            meta.hidden = !meta.hidden;
+                            legend.chart.update();
+                        },
+                    },
+                    title: {
+                        display: true,
+                        text: `AQI History for Station: ${stationCode}`,
+                    },
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Date',
+                        },
+                        ticks: {
+                            autoSkip: true,
+                            maxRotation: 45,
+                            minRotation: 30,
+                            maxTicksLimit: 10,
+                        },
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'AQI',
+                        },
+                        beginAtZero: true,
+                    },
+                },
+            };
+
+
+
+            if (!chartInstance) {
+                // Create the chart for the first time
+                chartInstance = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: dateTimeList, // Initial labels
+                        datasets: datasets, // Initial datasets
+                    },
+                    options: chartOptions
+                });
+            } else {
+                // Update labels
+                chartInstance.data.labels = dateTimeList;
+
+                // Update datasets without replacing them
+                datasets.forEach((newDataset, index) => {
+                    if (chartInstance.data.datasets[index]) {
+                        // Update the existing dataset
+                        chartInstance.data.datasets[index].data = newDataset.data;
+                    } else {
+                        // Add a new dataset if it doesn't exist
+                        chartInstance.data.datasets.push(newDataset);
+                    }
+                });
+
+
+                // Preserve `hidden` state for all datasets
+                chartInstance.data.datasets.forEach((dataset, index) => {
+                    if (datasets[index]) {
+                        dataset.hidden = dataset.hidden || datasets[index].hidden;
+                    }
+                });
+
+                // Update the chart
+                chartInstance.update();
+            }
+        }
+
+        // Socket.io setup
+        const socket = io(deploymentUrl);
+
+        // Listen for updates on 'update_station_stationCode_history' topic
+        socket.on(`update_station_${stationCode}_history`, (newData) => {
+            console.log('Received new data:', newData);
+            documents.push(newData);  // Append the new data to the global documents array
+            initDatasets();  // Reinitialize the datasets with the new data
+            initDateTimeList();  // Reinitialize the dateTimeList with the new data
+            renderChart();  // Update the chart with the new data
+        });
+
+        // Close the socket connection when the page is unloaded
+        window.onunload = () => {
+            if (socket) {
+                socket.disconnect();  // Close the Socket.IO connection
+                console.log('Socket connection closed');
+            }
+        };
+
+        // Fetch initial data
+        fetchStationData();
+
+    </script>
+</body>
+</html>

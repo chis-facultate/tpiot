@@ -1,14 +1,27 @@
 import eventlet
 eventlet.monkey_patch()  # This must be called before any other imports
-import os
-import copy
+
 from flask import Flask, request, jsonify, render_template
 from flask_socketio import SocketIO
+from pymongo import MongoClient
+import logging
+import copy
 
 # Global variables
-app = Flask(__name__)  # Flask app instance
+app = Flask(__name__)
 socketio = SocketIO(app)
 last_read_values = {}
+
+# Set up logging
+logging.basicConfig(
+    level=logging.DEBUG,  # Capture all log levels
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+)
+logger = logging.getLogger(__name__)
+
+# MongoDB Configuration
+mongo_client = MongoClient("mongodb+srv://user1:asdfsdfdzc13reqfvdf@cluster0.cve6w.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
+db = mongo_client['tpiot_db']
 
 # AQI thresholds
 minimum_aqi = 0
@@ -241,7 +254,7 @@ def calculate_aqi(item_name, concentration):
         concentration_low = bad_concentration_high
         concentration_high = very_bad_concentration_high
     else:
-        print('Concentration exceeds tha maximum concentration')
+        logger.debug('Concentration exceeds tha maximum concentration')
         exit(1)
 
     # Apply the linear interpolation formula to calculate the AQI
@@ -249,7 +262,7 @@ def calculate_aqi(item_name, concentration):
            + index_low)
 
     if aqi > maximum_aqi:
-        print('AQI exceeds maximum AQI possible')
+        logger.debug('AQI exceeds maximum AQI possible')
         exit(1)
 
     return int(aqi + 0.5)  # Round to first integer
@@ -269,11 +282,10 @@ def get_aqi_color(aqi):
     return color
 
 
-def calculate_aqi_for_all(station_data_dict):
+def calculate_aqi_for_all_items(station_data_dict):
     new_station_data_dict = copy.deepcopy(station_data_dict)
     sensors_data_dict = new_station_data_dict['Sensors data']
     items = sensors_data_dict.keys()
-
     for item_name in items:
         concentration = sensors_data_dict[item_name]['Value']
         aqi = calculate_aqi(item_name, concentration)
@@ -283,12 +295,19 @@ def calculate_aqi_for_all(station_data_dict):
     return new_station_data_dict
 
 
-# Endpoints
+# Page endpoints
 @app.route('/', methods=['GET'])
 def index():
     return render_template('index.html')
 
 
+@app.route('/history', methods=['GET'])
+def history():
+    station_code = request.args.get('stationCode', default='', type=str)
+    return render_template('history.html', stationCode=station_code)
+
+
+# Data endpoints
 @app.route('/stations', methods=['GET'])
 def get_stations():
     return jsonify(stations_data)
@@ -297,6 +316,13 @@ def get_stations():
 @app.route('/last_read_values', methods=['GET'])
 def get_last_read_values():
     return jsonify(last_read_values)
+
+
+@app.route('/history_data/<station_code>', methods=['GET'])
+def get_history_data(station_code):
+    collection = db[station_code]
+    documents = list(collection.find({}, {'_id': 0}))  # Exclude the MongoDB _id field
+    return jsonify(documents)
 
 
 # Receive data from the POST request and forward it to WebSocket clients
@@ -310,25 +336,37 @@ def receive_data():
         if not isinstance(data_dict, dict):
             raise ValueError('Invalid data format')
     except Exception as e:
-        print(f'Error receiving data: {e}')
+        logger.debug(f'Error receiving data: {e}')
         return jsonify({'status': 'error', 'message': 'Failed to receive data'}), 500
 
-    # Log the received data for debugging
-    print(f'Received data: {data_dict}')
+    # Log the received data
+    logger.debug(f'Received data: {data_dict}')
 
-    aqi_dict = calculate_aqi_for_all(data_dict)
+    # Calculate AQI
+    aqi_dict = calculate_aqi_for_all_items(data_dict)
+
+    # Update last read values dictionary
+    station_code = aqi_dict['Station code']
+    global last_read_values
+    last_read_values[station_code] = aqi_dict['Sensors data']
 
     # Send the processed data to the client using WebSocket
     try:
         socketio.emit('update_station_data', aqi_dict)
-        print(f'Data forwarded: {aqi_dict}')
+        logger.debug(f'Data forwarded on update_station_data: {aqi_dict}')
+        socketio.emit('update_station_' + station_code + '_history', last_read_values[station_code])
+        logger.debug(f'Data forwarded on update_station_stationCode_history: {last_read_values[station_code]}')
     except Exception as e:
-        print(f'Error forwarding data: {e}')
+        logger.debug(f'Error forwarding data: {e}')
         return jsonify({'status': 'error', 'message': 'Failed to forward data'}), 500
 
-    station_code = aqi_dict['Station code']
-    global last_read_values
-    last_read_values[station_code] = aqi_dict['Sensors data']
+    # Save the new data in databse
+    try:
+        collection = db[station_code]
+        collection.insert_one(last_read_values[station_code])
+    except Exception as e:
+        logger.debug(f'Error saving data in db: {e}')
+        return jsonify({'status': 'error', 'message': 'Failed to save data in db'}), 500
 
     # Return a successful response to the gateway
     return jsonify({'status': 'success', 'message': 'Data received and forwarded to client'}), 200
@@ -339,7 +377,7 @@ def receive_data():
 def handle_connect():
     client_ip = request.remote_addr
     client_port = request.environ.get('REMOTE_PORT')
-    print(f'Client connected from {client_ip}:{client_port}')
+    logger.debug(f'Client connected from {client_ip}:{client_port}')
 
 
 # SocketIO event for client disconnection
@@ -347,12 +385,12 @@ def handle_connect():
 def handle_disconnect():
     client_ip = request.remote_addr
     client_port = request.environ.get('REMOTE_PORT')
-    print(f'Client disconnected from {client_ip}:{client_port}')
+    logger.debug(f'Client disconnected from {client_ip}:{client_port}')
 
 
 def main():
     # Run Flask server
-    socketio.run(app, host='127.0.0.1', port='5000', debug=True, allow_unsafe_werkzeug=True)
+    socketio.run(app, host='0.0.0.0', port='5000', debug=True, allow_unsafe_werkzeug=True)
 
 
 if __name__ == '__main__':
