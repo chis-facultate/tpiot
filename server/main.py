@@ -19,10 +19,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# MongoDB Configuration
-mongo_client = MongoClient("mongodb+srv://user1:asdfsdfdzc13reqfvdf@cluster0.cve6w.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
-db = mongo_client['tpiot_db']
-
 # AQI thresholds
 minimum_aqi = 0
 good_aqi_high = 50
@@ -219,6 +215,11 @@ items_data_dict = {
 }
 
 
+def get_db():
+    mongo_client = MongoClient("mongodb+srv://user1:asdfsdfdzc13reqfvdf@cluster0.cve6w.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
+    return mongo_client['tpiot_db']
+
+
 # Calculates aqi for a certain pollutant
 def calculate_aqi(item_name, concentration):
     # Ensure pollutant exists in the item_data_dict
@@ -320,6 +321,7 @@ def get_last_read_values():
 
 @app.route('/history_data/<station_code>', methods=['GET'])
 def get_history_data(station_code):
+    db = get_db()
     collection = db[station_code]
     documents = list(collection.find({}, {'_id': 0}))  # Exclude the MongoDB _id field
     return jsonify(documents)
@@ -360,8 +362,9 @@ def receive_data():
         logger.debug(f'Error forwarding data: {e}')
         return jsonify({'status': 'error', 'message': 'Failed to forward data'}), 500
 
-    # Save the new data in databse
+    # Save the new data in database
     try:
+        db = get_db()
         collection = db[station_code]
         collection.insert_one(last_read_values[station_code])
     except Exception as e:
@@ -393,5 +396,4 @@ def main():
     socketio.run(app, host='0.0.0.0', port='5000', debug=True, allow_unsafe_werkzeug=True)
 
 
-if __name__ == '__main__':
-    main()
+main()
