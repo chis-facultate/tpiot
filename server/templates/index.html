@@ -4,11 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Seoul Stations Map</title>
-    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-    <!-- Socket.IO Client -->
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
-    <!-- Custom styles -->
     <style>
         #map {
             height: 800px;
@@ -111,7 +108,7 @@
                     markers[stationCode] = marker;
 
                     // Add a popup to each marker (display details about the station)
-                    const popupContent = `<b>${stationCode}</b><br><b>${stationName}</b><br>${address}<br>${generateViewHistoryButton(stationCode)}`;
+                    const popupContent = `<b>${stationCode}</b><br><b>${stationName}</b><br>${address}<br>${generateViewHistoryButton(stationCode)}<br>`;
                     marker.bindPopup(popupContent);
 
                     // Set up a listener for WebSocket messages to update pop-ups
@@ -229,10 +226,18 @@
                 let sensorData = sensorsData[sensor];
                 const aqi = sensorData['AQI'];
                 const aqiColor = sensorData['Color'];
+
+                function formatNumber(number) {
+                    if (number < 0){
+                        return number.toPrecision(1);
+                    }
+                    return number
+                }
+
                 table += `
                     <tr>
                         <td>${sensor}</td>
-                        <td>${sensorData['Value']}</td>
+                        <td>${formatNumber(sensorData['Value'])}</td>
                         <td>${sensorData['Measurement unit']}</td>
                         <td>${sensorData['Measurement date']}</td>
                         <td class="aqi-cell" style="background-color: ${aqiColor};">${aqi}</td>
