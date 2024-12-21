@@ -211,11 +211,10 @@
     }
 
     function formatNumber(number) {
-        console.log('**** number ' + number)
-        if (number < 0) {
+        if (number < 1) {
             return number.toPrecision(1);
         }
-        return number
+        return number;
     }
 
     // Function to generate an HTML table for sensor data
