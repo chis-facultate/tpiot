@@ -7,7 +7,7 @@ station_code = None
 flask_server_url = 'https://tpiot-1.onrender.com/data'
 # flask_server_url = 'http://localhost:5000/data'
 expected_sensors = ['SO2', 'NO2', 'CO', 'O3', 'PM10', 'PM2.5']
-# expected_sensors = ['SO2', 'NO2']
+#expected_sensors = ['SO2', 'NO2']
 sensors_data_buffer = {}
 
 

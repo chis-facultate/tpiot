@@ -4,35 +4,39 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Seoul Stations Map</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
     <style>
         #map {
             height: 800px;
             width: 100%;
         }
+
         .leaflet-popup-content {
             /* Remove max-width and max-height constraints to let the popup auto-size based on content */
             width: auto;
             height: auto;
-            overflow: visible;  /* Disable scrolling entirely */
-            white-space: normal;  /* Allow content to wrap to new lines */
+            overflow: visible; /* Disable scrolling entirely */
+            white-space: normal; /* Allow content to wrap to new lines */
         }
+
         .custom-table {
             width: 100%; /* Take the full width of the popup */
             table-layout: auto; /* Auto layout so table columns can expand naturally */
             word-wrap: break-word; /* Ensure long words break and wrap within cells */
         }
+
         .custom-table, .custom-table th, .custom-table td {
             border: 1px solid black;
         }
 
         .custom-table th, .custom-table td {
             border: 1px solid #ddd; /* Border for table cells */
-            padding: 8px;           /* Padding for table cells */
-            text-align: center;      /* Align text to the center */
-            font-size: 12px;        /* Smaller font size to fit more content */
+            padding: 8px; /* Padding for table cells */
+            text-align: center; /* Align text to the center */
+            font-size: 12px; /* Smaller font size to fit more content */
         }
+
         .custom-table th {
             background-color: #f2f2f2; /* Header background color */
             color: black; /* Header text color */
@@ -49,103 +53,103 @@
     </style>
 </head>
 <body>
-    <div id="map"></div>
+<div id="map"></div>
 
-    <!-- Leaflet JavaScript -->
-    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-    <script>
-        // Initialize the map centered at Seoul
-        var map = L.map('map').setView([37.5665, 126.9780], 11); // Center at Seoul
+<!-- Leaflet JavaScript -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+    // Initialize the map centered at Seoul
+    var map = L.map('map').setView([37.5665, 126.9780], 11); // Center at Seoul
 
-        // Add OpenStreetMap tiles
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(map);
+    // Add OpenStreetMap tiles
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
 
-        const deploymentUrl = 'https://tpiot-1.onrender.com';
-        // const deploymentUrl = 'http://localhost:5000';
+    const deploymentUrl = 'https://tpiot-1.onrender.com';
+    // const deploymentUrl = 'http://localhost:5000';
 
-        // Initialize Socket.IO
-        var socket = io.connect(deploymentUrl, {transports: ["websocket", "polling"]});
-        // Close the socket connection when the page is unloaded
-        window.onunload = () => {
-            if (socket) {
-                socket.disconnect();  // Close the Socket.IO connection
-                console.log('Socket connection closed');
-            }
-        };
+    // Initialize Socket.IO
+    var socket = io.connect(deploymentUrl, {transports: ["websocket", "polling"]});
+    // Close the socket connection when the page is unloaded
+    window.onunload = () => {
+        if (socket) {
+            socket.disconnect();  // Close the Socket.IO connection
+            console.log('Socket connection closed');
+        }
+    };
 
-        // Store markers in an object to easily update them later
-        var markers = {};
+    // Store markers in an object to easily update them later
+    var markers = {};
 
-        // Fetch station data from the Flask server
-        Promise.all([
-            fetch(deploymentUrl + '/stations').then(response => {
-                if (!response.ok) throw new Error('Failed to fetch /stations');
-                return response.json()
-            }),
-            fetch(deploymentUrl + '/last_read_values').then(response => {
-                if (!response.ok) throw new Error('Failed to fetch /last_read_values');
-                return response.json();
-            })
-        ])
-            .then(([stationsData, lastReadValues]) => {
-                // Loop through station data and place markers on the map
-                stationsData.forEach(station => {
-                    const stationCode = station['Station code'];
-                    const stationName = station['Station name'];
-                    const address = station['Address'];
-                    const lat = station['Latitude'];
-                    const lng = station['Longitude'];
+    // Fetch station data from the Flask server
+    Promise.all([
+        fetch(deploymentUrl + '/stations').then(response => {
+            if (!response.ok) throw new Error('Failed to fetch /stations');
+            return response.json()
+        }),
+        fetch(deploymentUrl + '/last_read_values').then(response => {
+            if (!response.ok) throw new Error('Failed to fetch /last_read_values');
+            return response.json();
+        })
+    ])
+        .then(([stationsData, lastReadValues]) => {
+            // Loop through station data and place markers on the map
+            stationsData.forEach(station => {
+                const stationCode = station['Station code'];
+                const stationName = station['Station name'];
+                const address = station['Address'];
+                const lat = station['Latitude'];
+                const lng = station['Longitude'];
 
-                    const sensorsData = lastReadValues[stationCode];
-                    const {maxAqi, maxAqiColor} = getMaxAqiAndColor(sensorsData);
+                const sensorsData = lastReadValues[stationCode];
+                const {maxAqi, maxAqiColor} = getMaxAqiAndColor(sensorsData);
 
-                    // Create a marker for each station with a default color
-                    var marker = L.marker([lat, lng], { icon: getMarkerIcon(maxAqi, maxAqiColor) }).addTo(map);
+                // Create a marker for each station with a default color
+                var marker = L.marker([lat, lng], {icon: getMarkerIcon(maxAqi, maxAqiColor)}).addTo(map);
 
-                    // Store marker in the markers object
-                    markers[stationCode] = marker;
+                // Store marker in the markers object
+                markers[stationCode] = marker;
 
-                    // Add a popup to each marker (display details about the station)
-                    const popupContent = `<b>${stationCode}</b><br><b>${stationName}</b><br>${address}<br>${generateViewHistoryButton(stationCode)}<br>`;
-                    marker.bindPopup(popupContent);
+                // Add a popup to each marker (display details about the station)
+                const popupContent = `<b>${stationCode}</b><br><b>${stationName}</b><br>${address}<br>${generateViewHistoryButton(stationCode)}<br>`;
+                marker.bindPopup(popupContent);
 
-                    // Set up a listener for WebSocket messages to update pop-ups
-                    socket.on('update_station_data', function(updatedStationData) {
+                // Set up a listener for WebSocket messages to update pop-ups
+                socket.on('update_station_data', function (updatedStationData) {
 
-                        // console.log('Received data:', updatedStationData);
+                    // console.log('Received data:', updatedStationData);
 
-                        // Check if the updated data corresponds to this station
-                        const updatedStationCode = updatedStationData['Station code'];
-                        if (updatedStationCode == stationCode) {
-                            
-                            // Update the pop-up with a table showing sensor data
-                            const updatedSensorsData = updatedStationData['Sensors data'];
-                            marker.setPopupContent(
-                                `${popupContent}<br>${generateTable(updatedSensorsData)}`
-                            );
-                            // Change marker icon based on AQI value
-                            const {maxAqi, maxAqiColor} = getMaxAqiAndColor(updatedSensorsData);
-                            marker.setIcon(getMarkerIcon(maxAqi, maxAqiColor));
-                        }
-                    });
+                    // Check if the updated data corresponds to this station
+                    const updatedStationCode = updatedStationData['Station code'];
+                    if (updatedStationCode == stationCode) {
+
+                        // Update the pop-up with a table showing sensor data
+                        const updatedSensorsData = updatedStationData['Sensors data'];
+                        marker.setPopupContent(
+                            `${popupContent}<br>${generateTable(updatedSensorsData)}`
+                        );
+                        // Change marker icon based on AQI value
+                        const {maxAqi, maxAqiColor} = getMaxAqiAndColor(updatedSensorsData);
+                        marker.setIcon(getMarkerIcon(maxAqi, maxAqiColor));
+                    }
                 });
             });
+        });
 
-        // Function to get marker icon based on AQI value and color
-        function getMarkerIcon(maxAqi = undefined, maxAqiColor = undefined) {
-            // Default color if none provided
-            if (maxAqiColor == undefined) {
-                maxAqiColor = 'black'; // Default (turned off station)
-            }
+    // Function to get marker icon based on AQI value and color
+    function getMarkerIcon(maxAqi = undefined, maxAqiColor = undefined) {
+        // Default color if none provided
+        if (maxAqiColor == undefined) {
+            maxAqiColor = 'gray'; // Default (turned off station)
+        }
 
-            // Display AQI inside the marker
-            const aqiDisplay = (maxAqi == undefined) ? '' : maxAqi; // Show AQI if it's defined, otherwise empty
+        // Display AQI inside the marker
+        const aqiDisplay = (maxAqi == undefined) ? '' : maxAqi; // Show AQI if it's defined, otherwise empty
 
-            return L.divIcon({
-                className: 'custom-marker',
-                html: `
+        return L.divIcon({
+            className: 'custom-marker',
+            html: `
                     <div style="
                         background-color: ${maxAqiColor};
                         border-radius: 50%;
@@ -160,31 +164,31 @@
                     ">
                         ${aqiDisplay}
                     </div>`,
-                iconSize: [40, 40]  // Adjust size to fit the AQI text inside the marker
-            });
+            iconSize: [40, 40]  // Adjust size to fit the AQI text inside the marker
+        });
+    }
+
+
+    function getMaxAqiAndColor(sensorsData) {
+        if (sensorsData == undefined) {
+            return {undefined, undefined}
         }
-
-
-        function getMaxAqiAndColor(sensorsData){
-            if (sensorsData == undefined){
-                return {undefined, undefined}
+        const items = Object.keys(sensorsData);
+        let maxAqi = sensorsData[items[0]]['AQI'];
+        let maxAqiColor = sensorsData[items[0]]['Color'];
+        items.forEach(sensor => {
+            const item_aqi = sensorsData[sensor]['AQI'];
+            if (item_aqi > maxAqi) {
+                maxAqi = item_aqi;
+                maxAqiColor = sensorsData[sensor]['Color'];
             }
-            const items = Object.keys(sensorsData);
-            let maxAqi = sensorsData[items[0]]['AQI'];
-            let maxAqiColor = sensorsData[items[0]]['Color'];
-            items.forEach(sensor => {
-                const item_aqi = sensorsData[sensor]['AQI'];
-                if (item_aqi > maxAqi){
-                    maxAqi = item_aqi;
-                    maxAqiColor = sensorsData[sensor]['Color'];
-                }
-            });
-            return {maxAqi, maxAqiColor};
-        }
+        });
+        return {maxAqi, maxAqiColor};
+    }
 
-        // Function to generate a "View History" button
-        function generateViewHistoryButton(stationCode) {
-            return `
+    // Function to generate a "View History" button
+    function generateViewHistoryButton(stationCode) {
+        return `
                 <button onclick="viewHistory('${stationCode}')" style="
                     margin-top: 10px;
                     padding: 8px 12px;
@@ -197,18 +201,26 @@
                     View History
                 </button>
             `;
-        }
+    }
 
-        // Function to handle "View History" button click
-        function viewHistory(stationCode) {
-            // Redirect to the history page with stationCode as a query parameter
-            const historyPageUrl = deploymentUrl + `/history?stationCode=${stationCode}`;
-            window.location.href = historyPageUrl;
-        }
+    // Function to handle "View History" button click
+    function viewHistory(stationCode) {
+        // Redirect to the history page with stationCode as a query parameter
+        const historyPageUrl = deploymentUrl + `/history?stationCode=${stationCode}`;
+        window.location.href = historyPageUrl;
+    }
 
-        // Function to generate an HTML table for sensor data
-        function generateTable(sensorsData) {
-            let table = `
+    function formatNumber(number) {
+        console.log('**** number ' + number)
+        if (number < 0) {
+            return number.toPrecision(1);
+        }
+        return number
+    }
+
+    // Function to generate an HTML table for sensor data
+    function generateTable(sensorsData) {
+        let table = `
                 <table class="custom-table">
                     <thead>
                         <tr>
@@ -220,32 +232,29 @@
                         </tr>
                     </thead>
                     <tbody>`;
-            // Dynamic content in the table
-            const sensors = Object.keys(sensorsData);
-            sensors.forEach(sensor => {
-                let sensorData = sensorsData[sensor];
-                const aqi = sensorData['AQI'];
-                const aqiColor = sensorData['Color'];
+        // Dynamic content in the table
+        const sensors = Object.keys(sensorsData);
+        sensors.forEach(sensor => {
+            const sensorData = sensorsData[sensor];
+            let value = sensorData['Value'];
+            value = formatNumber(value);
+            const unit = sensorData['Measurement unit'];
+            const timestamp = sensorData['Measurement date'];
+            const aqi = sensorData['AQI'];
+            const aqiColor = sensorData['Color'];
 
-                function formatNumber(number) {
-                    if (number < 0){
-                        return number.toPrecision(1);
-                    }
-                    return number
-                }
-
-                table += `
+            table += `
                     <tr>
                         <td>${sensor}</td>
-                        <td>${formatNumber(sensorData['Value'])}</td>
-                        <td>${sensorData['Measurement unit']}</td>
-                        <td>${sensorData['Measurement date']}</td>
+                        <td>${value}</td>
+                        <td>${unit}</td>
+                        <td>${timestamp}</td>
                         <td class="aqi-cell" style="background-color: ${aqiColor};">${aqi}</td>
                     </tr>`;
-            });
-            table += '</tbody></table>';
-            return table;
-        }
-    </script>
+        });
+        table += '</tbody></table>';
+        return table;
+    }
+</script>
 </body>
 </html>

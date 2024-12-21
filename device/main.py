@@ -76,11 +76,11 @@ def simulate_sensor_data(station_id, item_code, mqtt_client, mqtt_topic):
               },
         '8': {
             'Item name': 'PM10',
-            'Unit of measurement': 'microgram/m3'
+            'Unit of measurement': 'mcg/m3'
               },
         '9': {
             'Item name': 'PM2.5',
-            'Unit of measurement': 'microgram/m3'
+            'Unit of measurement': 'mcg/m3'
               }
     }
 
