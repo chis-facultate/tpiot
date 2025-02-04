@@ -366,7 +366,9 @@ def receive_data():
     try:
         db = get_db()
         collection = db[station_code]
-        collection.insert_one(last_read_values[station_code])
+        station_data = last_read_values[station_code]
+        copy_to_insert = copy.deepcopy(station_data)
+        collection.insert_one(copy_to_insert)
     except Exception as e:
         logger.debug(f'Error saving data in db: {e}')
         return jsonify({'status': 'error', 'message': 'Failed to save data in db'}), 500
