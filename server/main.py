@@ -299,24 +299,24 @@ def calculate_aqi_for_all_items(station_data_dict):
 # Page endpoints
 @app.route('/', methods=['GET'])
 def index():
-    return render_template('index.html')
+    return render_template('index.html'), 200
 
 
 @app.route('/history', methods=['GET'])
 def history():
     station_code = request.args.get('stationCode', default='', type=str)
-    return render_template('history.html', stationCode=station_code)
+    return render_template('history.html', stationCode=station_code), 200
 
 
 # Data endpoints
 @app.route('/stations', methods=['GET'])
 def get_stations():
-    return jsonify(stations_data)
+    return jsonify(stations_data), 200
 
 
 @app.route('/last_read_values', methods=['GET'])
 def get_last_read_values():
-    return jsonify(last_read_values)
+    return jsonify(last_read_values), 200
 
 
 @app.route('/history_data/<station_code>', methods=['GET'])
@@ -324,7 +324,7 @@ def get_history_data(station_code):
     db = get_db()
     collection = db[station_code]
     documents = list(collection.find({}, {'_id': 0}))  # Exclude the MongoDB _id field
-    return jsonify(documents)
+    return jsonify(documents), 200
 
 
 # Receive data from the POST request and forward it to WebSocket clients
