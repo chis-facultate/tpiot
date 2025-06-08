@@ -289,6 +289,7 @@ def calculate_aqi_for_all_items(station_data_dict):
     items = sensors_data_dict.keys()
     for item_name in items:
         concentration = sensors_data_dict[item_name]['Value']
+        concentration = float(concentration)
         aqi = calculate_aqi(item_name, concentration)
         color = get_aqi_color(aqi)
         new_station_data_dict['Sensors data'][item_name]['AQI'] = aqi
